@@ -92,6 +92,45 @@ class CameraManager:
             return self.exit_camera.get_frame()
         return None
 
+    def update_cameras(self, entry_index: int = None, exit_index: int = None) -> bool:
+        """Update camera configuration with new indices"""
+        try:
+            success = True
+
+            # Update entry camera if index provided
+            if entry_index is not None:
+                if self.entry_camera:
+                    self.entry_camera.disconnect()
+
+                self.entry_camera = CameraStream(
+                    camera_type="webcam",
+                    camera_index=entry_index
+                )
+                entry_connected = self.entry_camera.connect()
+                if not entry_connected:
+                    success = False
+                    print(f"Failed to connect to entry camera at index {entry_index}")
+
+            # Update exit camera if index provided
+            if exit_index is not None:
+                if self.exit_camera:
+                    self.exit_camera.disconnect()
+
+                self.exit_camera = CameraStream(
+                    camera_type="webcam",
+                    camera_index=exit_index
+                )
+                exit_connected = self.exit_camera.connect()
+                if not exit_connected:
+                    success = False
+                    print(f"Failed to connect to exit camera at index {exit_index}")
+
+            return success
+
+        except Exception as e:
+            print(f"Error updating cameras: {e}")
+            return False
+
     def shutdown(self):
         """Disconnect all cameras"""
         if self.entry_camera:

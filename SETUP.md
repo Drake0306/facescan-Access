@@ -40,13 +40,16 @@ notepad .env
 - Camera settings can use webcam by default (index 0 and 1)
 - Gate controller is in MOCK mode by default
 
-### 3. Start Backend Services (Docker)
+### 3. Start Backend Services
 
 Open PowerShell or Command Prompt in the project directory:
 
 ```bash
-# Start all Docker containers
+# Start Docker containers (database, backend, gate controller)
 docker-compose up -d
+
+# Stop the face-service container (it can't access cameras in Docker on Windows)
+docker stop facescan-face-service
 
 # Check if containers are running
 docker-compose ps
@@ -56,13 +59,37 @@ docker-compose ps
 - PostgreSQL Database (port 5432)
 - pgAdmin (port 5050) - Database management UI
 - Backend API (port 8000)
-- Face Recognition Service (port 8001)
 - Gate Controller (port 8002)
 
-### 4. Initialize Database
+**Note:** The face-service will be run locally on the host machine (see next step) because Docker containers on Windows cannot access USB/webcam cameras.
+
+### 4. Start Face Recognition Service (Local)
+
+The face-service must run locally to access cameras on Windows:
 
 ```bash
-# Run database initialization script
+# Open a new terminal/PowerShell window
+cd face-service
+
+# Install Python dependencies (first time only)
+pip install -r requirements.txt
+
+# Create .env file if it doesn't exist
+copy .env.example .env
+
+# Start the face-service
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+**Keep this terminal running.** The face-service (port 8001) provides:
+- Camera detection and enumeration
+- Face detection and recognition
+- Real-time camera feeds
+
+### 5. Initialize Database
+
+```bash
+# In a new terminal, run database initialization script
 docker-compose exec backend python -m app.db.init_db
 ```
 
@@ -70,7 +97,7 @@ docker-compose exec backend python -m app.db.init_db
 - **Admin**: username=`admin`, password=`admin123`
 - **Guard**: username=`guard`, password=`guard123`
 
-### 5. Setup Electron Desktop App
+### 6. Setup Electron Desktop App
 
 ```bash
 cd electron-app
@@ -200,11 +227,18 @@ docker-compose restart gate-controller
 
 ### Starting Development
 
-```bash
-# Terminal 1 - Start backend services
-docker-compose up
+You'll need **3 terminal windows**:
 
-# Terminal 2 - Start Electron app
+```bash
+# Terminal 1 - Start Docker services (backend, database, gate controller)
+docker-compose up -d
+docker stop facescan-face-service
+
+# Terminal 2 - Start face-service locally (for camera access)
+cd face-service
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
+# Terminal 3 - Start Electron app
 cd electron-app
 npm run dev
 ```
@@ -275,11 +309,28 @@ docker-compose up
 ### Face recognition not working
 
 ```bash
-# Check camera connection
-docker-compose exec face-service python -c "import cv2; print(cv2.VideoCapture(0).isOpened())"
+# Check camera connection (run from face-service directory)
+cd face-service
+python -c "import cv2; print('Camera 0:', cv2.VideoCapture(0).isOpened())"
+python -c "import cv2; print('Camera 1:', cv2.VideoCapture(1).isOpened())"
 
-# View face service logs
-docker-compose logs -f face-service
+# Make sure face-service is running locally, not in Docker
+# Check the terminal where you started: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+### Camera list showing "No cameras detected"
+
+```bash
+# On Windows, cameras don't work in Docker containers
+# Make sure you stopped the Docker face-service container:
+docker stop facescan-face-service
+
+# Then start face-service locally:
+cd face-service
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
+# Verify cameras are detected:
+curl http://localhost:8001/api/v1/detection/cameras/list
 ```
 
 ### Database connection errors

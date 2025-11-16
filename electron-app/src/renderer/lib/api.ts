@@ -2,9 +2,17 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const FACE_SERVICE_URL = import.meta.env.VITE_FACE_SERVICE_URL || 'http://localhost:8001'
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+export const faceServiceApi = axios.create({
+  baseURL: FACE_SERVICE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -72,4 +80,16 @@ export const reportsAPI = {
   getVisitorFrequency: (startDate: string, endDate: string) =>
     api.get('/reports/frequency', { params: { start_date: startDate, end_date: endDate } }),
   export: (params: any) => api.get('/reports/export', { params, responseType: 'blob' }),
+}
+
+export const cameraAPI = {
+  listAvailable: () => faceServiceApi.get('/api/v1/detection/cameras/list'),
+  configure: (entryIndex?: number, exitIndex?: number) =>
+    faceServiceApi.post('/api/v1/detection/cameras/configure', null, {
+      params: {
+        entry_index: entryIndex,
+        exit_index: exitIndex,
+      },
+    }),
+  getStatus: () => faceServiceApi.get('/api/v1/detection/camera/status'),
 }
