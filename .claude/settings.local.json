@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline --all -20)"
+      "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline --all -20)",
+      "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline -1)",
+      "Bash(docker-compose exec:*)"
     ],
     "deny": [],
     "ask": []
