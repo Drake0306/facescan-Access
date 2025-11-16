@@ -1,13 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Camera, Users, LogIn, LogOut } from 'lucide-react'
 import MainLayout from '@/components/layout/MainLayout'
 import { wsService } from '@/lib/websocket'
 import { useToast } from '@/components/ui/use-toast'
+import { cameraAPI } from '@/lib/api'
 
 export default function DashboardPage() {
   const { toast } = useToast()
+  const [entrySrc, setEntrySrc] = useState<string>('')
+  const [exitSrc, setExitSrc] = useState<string>('')
+  const entryInterval = useRef<number | null>(null)
+  const exitInterval = useRef<number | null>(null)
 
   useEffect(() => {
     // Connect to WebSocket
@@ -32,6 +37,28 @@ export default function DashboardPage() {
       wsService.disconnect()
     }
   }, [toast])
+
+  // Setup simple polling to refresh camera frames
+  useEffect(() => {
+    const entryUrl = cameraAPI.frameUrl('entry')
+    const exitUrl = cameraAPI.frameUrl('exit')
+
+    const refreshEntry = () => setEntrySrc(`${entryUrl}&ts=${Date.now()}`)
+    const refreshExit = () => setExitSrc(`${exitUrl}&ts=${Date.now()}`)
+
+    // Initial load
+    refreshEntry()
+    refreshExit()
+
+    // Poll every 1000ms
+    entryInterval.current = window.setInterval(refreshEntry, 1000)
+    exitInterval.current = window.setInterval(refreshExit, 1000)
+
+    return () => {
+      if (entryInterval.current) window.clearInterval(entryInterval.current)
+      if (exitInterval.current) window.clearInterval(exitInterval.current)
+    }
+  }, [])
 
   return (
     <MainLayout>
@@ -92,8 +119,17 @@ export default function DashboardPage() {
               <CardTitle>Entry Camera</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                <p className="text-muted-foreground">Camera feed will appear here</p>
+              <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                {entrySrc ? (
+                  <img
+                    src={entrySrc}
+                    alt="Entry camera"
+                    className="w-full h-full object-contain"
+                    onError={() => setEntrySrc('')}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No feed</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -102,8 +138,17 @@ export default function DashboardPage() {
               <CardTitle>Exit Camera</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                <p className="text-muted-foreground">Camera feed will appear here</p>
+              <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                {exitSrc ? (
+                  <img
+                    src={exitSrc}
+                    alt="Exit camera"
+                    className="w-full h-full object-contain"
+                    onError={() => setExitSrc('')}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No feed</p>
+                )}
               </div>
             </CardContent>
           </Card>

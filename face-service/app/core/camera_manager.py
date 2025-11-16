@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from typing import Optional
+import platform
+from typing import Optional, List
 from app.core.config import settings
 
 
@@ -17,12 +18,43 @@ class CameraStream:
         try:
             if self.camera_type == "rtsp" and self.rtsp_url:
                 self.cap = cv2.VideoCapture(self.rtsp_url)
-            else:
-                self.cap = cv2.VideoCapture(self.camera_index)
+                if self.cap.isOpened():
+                    self.is_connected = True
+                    return True
+                return False
 
-            if self.cap.isOpened():
-                self.is_connected = True
-                return True
+            # Try multiple backends for webcams (helps when one backend gets stuck)
+            backends: List[int] = []
+            system = platform.system()
+            if system == "Windows":
+                backends = [
+                    getattr(cv2, 'CAP_DSHOW', 700),
+                    getattr(cv2, 'CAP_MSMF', 1400),
+                    getattr(cv2, 'CAP_ANY', 0),
+                ]
+            elif system == "Linux":
+                backends = [
+                    getattr(cv2, 'CAP_V4L2', 200),
+                    getattr(cv2, 'CAP_ANY', 0),
+                ]
+            elif system == "Darwin":
+                backends = [
+                    getattr(cv2, 'CAP_AVFOUNDATION', 1200),
+                    getattr(cv2, 'CAP_ANY', 0),
+                ]
+            else:
+                backends = [getattr(cv2, 'CAP_ANY', 0)]
+
+            for backend in backends:
+                try:
+                    cap = cv2.VideoCapture(self.camera_index, backend)
+                    if cap.isOpened():
+                        self.cap = cap
+                        self.is_connected = True
+                        return True
+                    cap.release()
+                except Exception:
+                    pass
             return False
         except Exception as e:
             print(f"Error connecting to camera: {e}")
@@ -130,6 +162,35 @@ class CameraManager:
         except Exception as e:
             print(f"Error updating cameras: {e}")
             return False
+
+    def reset_cameras(self, entry_index: int = None, exit_index: int = None):
+        """Force reset cameras (disconnect and reconnect, trying multiple backends).
+
+        If indices are provided, target those; otherwise reset currently configured streams.
+        Returns a dict with connection statuses.
+        """
+        result = {"entry": False, "exit": False}
+        try:
+            # Entry
+            if entry_index is not None:
+                if self.entry_camera:
+                    self.entry_camera.disconnect()
+                self.entry_camera = CameraStream(camera_type="webcam", camera_index=entry_index)
+            if self.entry_camera:
+                result["entry"] = self.entry_camera.reconnect()
+
+            # Exit
+            if exit_index is not None:
+                if self.exit_camera:
+                    self.exit_camera.disconnect()
+                self.exit_camera = CameraStream(camera_type="webcam", camera_index=exit_index)
+            if self.exit_camera:
+                result["exit"] = self.exit_camera.reconnect()
+
+            return result
+        except Exception as e:
+            print(f"Error resetting cameras: {e}")
+            return result
 
     def shutdown(self):
         """Disconnect all cameras"""

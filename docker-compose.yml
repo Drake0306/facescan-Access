@@ -73,6 +73,8 @@ services:
     command: uvicorn app.main:socket_app --host 0.0.0.0 --port 8000 --reload
 
   # Face Recognition Service
+  # Note: On Windows, run this service outside Docker for camera access
+  # Use: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
   face-service:
     build:
       context: ./face-service
@@ -99,13 +101,13 @@ services:
     volumes:
       - ./face-service:/app
       - face_data:/data
-      - /dev/video0:/dev/video0  # Webcam access (Linux)
     networks:
       - facescan-network
     depends_on:
       postgres:
         condition: service_healthy
-    privileged: true  # Required for camera access
+    profiles:
+      - linux  # Only run in Docker on Linux; use native Python on Windows
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
   # Gate Controller Service

@@ -92,4 +92,15 @@ export const cameraAPI = {
       },
     }),
   getStatus: () => faceServiceApi.get('/api/v1/detection/camera/status'),
+  frameUrl: (which: 'entry' | 'exit') =>
+    `${FACE_SERVICE_URL}/api/v1/detection/cameras/frame?camera=${which}`,
+  reset: (entryIndex?: number, exitIndex?: number, restartServices?: boolean) =>
+    faceServiceApi.post('/api/v1/detection/cameras/reset', null, {
+      params: {
+        entry_index: entryIndex,
+        exit_index: exitIndex,
+        restart_services: restartServices,
+      },
+      timeout: 15000,
+    }),
 }

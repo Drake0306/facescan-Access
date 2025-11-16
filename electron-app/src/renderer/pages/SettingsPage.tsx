@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { cameraAPI } from '@/lib/api'
-import { Loader2, Video, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, Video, CheckCircle2, XCircle, Wrench } from 'lucide-react'
 
 interface Camera {
   index: number
@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [cameras, setCameras] = useState<Camera[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [fixing, setFixing] = useState(false)
   const [entryCamera, setEntryCamera] = useState<string>('')
   const [exitCamera, setExitCamera] = useState<string>('')
   const [cameraStatus, setCameraStatus] = useState<{ entry_camera: boolean; exit_camera: boolean }>({
@@ -32,6 +33,14 @@ export default function SettingsPage() {
     exit_camera: false,
   })
   const { toast } = useToast()
+
+  // Load saved selections from localStorage
+  useEffect(() => {
+    const savedEntry = localStorage.getItem('entryCameraIndex')
+    const savedExit = localStorage.getItem('exitCameraIndex')
+    if (savedEntry) setEntryCamera(savedEntry)
+    if (savedExit) setExitCamera(savedExit)
+  }, [])
 
   // Fetch available cameras
   useEffect(() => {
@@ -59,6 +68,52 @@ export default function SettingsPage() {
     fetchCameras()
   }, [toast])
 
+  const handleFixStuck = async () => {
+    try {
+      setFixing(true)
+      const entryIndex = entryCamera ? parseInt(entryCamera) : undefined
+      const exitIndex = exitCamera ? parseInt(exitCamera) : undefined
+
+      const response = await cameraAPI.reset(entryIndex, exitIndex, true)
+
+      if (response.data.success) {
+        // Refresh list and status
+        const [listResp, statusResp] = await Promise.all([
+          cameraAPI.listAvailable(),
+          cameraAPI.getStatus(),
+        ])
+        setCameras(listResp.data.cameras)
+        setCameraStatus(statusResp.data)
+
+        const serviceMsg = response.data.service_restart_attempted
+          ? response.data.service_restart_success
+            ? ' (Camera service restarted)'
+            : ' (Service restart may require admin permissions)'
+          : ''
+
+        toast({
+          title: 'Attempted to fix cameras',
+          description: `Entry: ${response.data.entry_camera_connected ? 'OK' : 'Not available'}, Exit: ${response.data.exit_camera_connected ? 'OK' : 'Not available'}${serviceMsg}`,
+        })
+      } else {
+        toast({
+          title: 'Unable to fix cameras',
+          description: 'No changes were applied.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to attempt camera fix',
+        variant: 'destructive',
+      })
+      console.error('Error fixing cameras:', error)
+    } finally {
+      setFixing(false)
+    }
+  }
+
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -80,9 +135,13 @@ export default function SettingsPage() {
           exit_camera: response.data.exit_camera_connected,
         })
 
-        // Clear selections after successful save
-        setEntryCamera('')
-        setExitCamera('')
+        // Persist selections
+        if (entryIndex !== undefined) {
+          localStorage.setItem('entryCameraIndex', String(entryIndex))
+        }
+        if (exitIndex !== undefined) {
+          localStorage.setItem('exitCameraIndex', String(exitIndex))
+        }
       } else {
         toast({
           title: 'Warning',
@@ -121,6 +180,21 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="flex items-center justify-end">
+              <Button variant="secondary" onClick={handleFixStuck} disabled={fixing}>
+                {fixing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fixing...
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="mr-2 h-4 w-4" />
+                    Fix Stuck Cameras
+                  </>
+                )}
+              </Button>
+            </div>
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -156,11 +230,28 @@ export default function SettingsPage() {
                         <SelectValue placeholder="Select entry camera" />
                       </SelectTrigger>
                       <SelectContent>
-                        {cameras.map((camera) => (
-                          <SelectItem key={camera.index} value={camera.index.toString()}>
-                            {camera.name} (Index {camera.index})
-                          </SelectItem>
-                        ))}
+                        {/* Include saved selection even if now inactive */}
+                        {(() => {
+                          const options = [...cameras]
+                          const saved = entryCamera ? parseInt(entryCamera) : undefined
+                          const present = options.some((c) => c.index === saved)
+                          const items: JSX.Element[] = []
+                          if (saved !== undefined && !present) {
+                            items.push(
+                              <SelectItem key={`saved-entry-${saved}`} value={String(saved)}>
+                                Camera {saved} (Inactive)
+                              </SelectItem>
+                            )
+                          }
+                          for (const cam of options) {
+                            items.push(
+                              <SelectItem key={cam.index} value={cam.index.toString()}>
+                                {cam.name} (Index {cam.index}) {cam.available ? '[Active]' : '[Inactive]'}
+                              </SelectItem>
+                            )
+                          }
+                          return items
+                        })()}
                       </SelectContent>
                     </Select>
                     <p className="text-sm text-muted-foreground">
@@ -191,11 +282,27 @@ export default function SettingsPage() {
                         <SelectValue placeholder="Select exit camera" />
                       </SelectTrigger>
                       <SelectContent>
-                        {cameras.map((camera) => (
-                          <SelectItem key={camera.index} value={camera.index.toString()}>
-                            {camera.name} (Index {camera.index})
-                          </SelectItem>
-                        ))}
+                        {(() => {
+                          const options = [...cameras]
+                          const saved = exitCamera ? parseInt(exitCamera) : undefined
+                          const present = options.some((c) => c.index === saved)
+                          const items: JSX.Element[] = []
+                          if (saved !== undefined && !present) {
+                            items.push(
+                              <SelectItem key={`saved-exit-${saved}`} value={String(saved)}>
+                                Camera {saved} (Inactive)
+                              </SelectItem>
+                            )
+                          }
+                          for (const cam of options) {
+                            items.push(
+                              <SelectItem key={cam.index} value={cam.index.toString()}>
+                                {cam.name} (Index {cam.index}) {cam.available ? '[Active]' : '[Inactive]'}
+                              </SelectItem>
+                            )
+                          }
+                          return items
+                        })()}
                       </SelectContent>
                     </Select>
                     <p className="text-sm text-muted-foreground">
