@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline --all -20)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
