@@ -3,7 +3,19 @@
     "allow": [
       "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline --all -20)",
       "Bash(git -C \"c:\\Github\\facescan-Access\" log --oneline -1)",
-      "Bash(docker-compose exec:*)"
+      "Bash(docker-compose exec:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:main:*)",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx:*)",
+      "Bash(docker-compose ps:*)"
     ],
     "deny": [],
     "ask": []

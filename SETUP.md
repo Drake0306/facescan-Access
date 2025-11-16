@@ -63,7 +63,7 @@ docker-compose ps
 
 ```bash
 # Run database initialization script
-docker-compose exec backend python app/db/init_db.py
+docker-compose exec backend python -m app.db.init_db
 ```
 
 **Default Users Created:**
